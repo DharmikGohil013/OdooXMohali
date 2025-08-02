@@ -1,6 +1,6 @@
 import React from 'react'
 import { useSelector } from 'react-redux'
-import { FiMenu, FiBell, FiSearch } from 'react-icons/fi'
+import { FiMenu, FiSearch } from 'react-icons/fi'
 
 const Header = ({ onMenuClick }) => {
   const { user } = useSelector((state) => state.auth)
@@ -32,17 +32,6 @@ const Header = ({ onMenuClick }) => {
         
         {/* Right side */}
         <div className="flex items-center space-x-4">
-          {/* Notifications */}
-          <div className="relative">
-            <button className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-full transition-colors">
-              <FiBell size={20} />
-            </button>
-            {/* Notification badge */}
-            <div className="absolute -top-1 -right-1 h-4 w-4 bg-blue-500 text-white text-xs rounded-full flex items-center justify-center">
-              3
-            </div>
-          </div>
-          
           {/* User info */}
           <div className="flex items-center">
             <div className="hidden sm:block text-right mr-3">
