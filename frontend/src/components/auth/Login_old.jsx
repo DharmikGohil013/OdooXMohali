@@ -37,7 +37,7 @@ const Login = () => {
 
   // Logo SVG Component
   const Logo = () => (
-    <svg className="w-10 h-10 mx-auto" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg className="w-12 h-12 mx-auto" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
       <rect width="100" height="100" rx="20" fill="url(#gradient)" />
       <path d="M30 25h40a5 5 0 015 5v15a5 5 0 01-5 5H30a5 5 0 01-5-5V30a5 5 0 015-5z" fill="white" fillOpacity="0.9"/>
       <path d="M30 55h25a5 5 0 015 5v15a5 5 0 01-5 5H30a5 5 0 01-5-5V60a5 5 0 015-5z" fill="white" fillOpacity="0.7"/>
@@ -66,17 +66,16 @@ const Login = () => {
       <rect x="140" y="120" width="120" height="80" rx="8" fill="url(#monitorGradient)" />
       <rect x="150" y="130" width="100" height="60" rx="4" fill="#f1f5f9" />
       
-      {/* Screen Content */}
-      <rect x="160" y="140" width="80" height="3" rx="1.5" fill="#3b82f6" />
-      <rect x="160" y="150" width="60" height="3" rx="1.5" fill="#94a3b8" />
-      <rect x="160" y="160" width="70" height="3" rx="1.5" fill="#94a3b8" />
-      <rect x="160" y="170" width="50" height="3" rx="1.5" fill="#94a3b8" />
+      {/* Monitor Content - Help Desk Interface */}
+      <rect x="155" y="135" width="90" height="8" rx="2" fill="#3b82f6" />
+      <rect x="155" y="148" width="60" height="4" rx="2" fill="#94a3b8" />
+      <rect x="155" y="156" width="70" height="4" rx="2" fill="#94a3b8" />
+      <circle cx="235" cy="170" r="8" fill="#10b981" />
+      <rect x="220" y="175" width="30" height="3" rx="1" fill="#10b981" />
       
-      {/* Keyboard */}
-      <rect x="150" y="205" width="100" height="15" rx="3" fill="#e2e8f0" />
-      
-      {/* Mouse */}
-      <ellipse cx="270" cy="210" rx="8" ry="12" fill="#cbd5e1" />
+      {/* Monitor Stand */}
+      <rect x="190" y="200" width="20" height="15" rx="2" fill="#64748b" />
+      <rect x="180" y="215" width="40" height="8" rx="4" fill="#64748b" />
       
       {/* Person/User */}
       <circle cx="320" cy="100" r="25" fill="url(#personGradient)" />
@@ -121,8 +120,8 @@ const Login = () => {
           <stop offset="100%" stopColor="#1f2937" />
         </linearGradient>
         <linearGradient id="personGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#fbbf24" />
-          <stop offset="100%" stopColor="#f59e0b" />
+          <stop offset="0%" stopColor="#f59e0b" />
+          <stop offset="100%" stopColor="#d97706" />
         </linearGradient>
       </defs>
     </svg>
@@ -238,12 +237,12 @@ const Login = () => {
                 </div>
                 
                 {/* Forgot Password Link */}
-                <div className="text-right">
+                <div className="flex justify-end">
                   <Link
                     to="/forgot-password"
-                    className="text-sm text-blue-600 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded"
+                    className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded px-1"
                   >
-                    Forgot password?
+                    Forgot your password?
                   </Link>
                 </div>
                 

@@ -169,35 +169,34 @@ const Profile = () => {
   const newPassword = watchPassword('newPassword')
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="text-center">
-        <h1 className="text-3xl font-bold text-blue-900 mb-2">
-          Profile Settings
-        </h1>
-        <p className="text-blue-600">
-          Manage your account information and preferences
-        </p>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 py-8">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            Profile Settings
+          </h1>
+          <p className="text-gray-600">
+            Manage your account information and preferences
+          </p>
+        </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Profile Info Card */}
-        <div className="lg:col-span-2">
-          <GlassCard className="p-8">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-blue-900">Personal Information</h2>
-              {!isEditing && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsEditing(true)}
-                  className="flex items-center"
-                >
-                  <FiEdit2 className="w-4 h-4 mr-2" />
-                  Edit Profile
-                </Button>
-              )}
-            </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Profile Info Card */}
+          <div className="lg:col-span-2">
+            <GlassCard className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-semibold text-gray-900">Personal Information</h2>
+                {!isEditing && (
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="flex items-center px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                  >
+                    <FiEdit2 className="w-4 h-4 mr-2" />
+                    Edit Profile
+                  </button>
+                )}
+              </div>
 
               <form onSubmit={handleSubmitProfile(onSubmitProfile)} className="space-y-6">
                 {/* Avatar Section */}
@@ -563,6 +562,7 @@ const Profile = () => {
           </div>
         </div>
       </div>
+    </div>
   )
 }
 

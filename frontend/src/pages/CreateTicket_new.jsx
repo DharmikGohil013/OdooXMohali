@@ -6,7 +6,6 @@ import { FiUpload, FiX, FiFile, FiCheck, FiAlertCircle, FiEdit, FiTag, FiFlag } 
 import { createTicket } from '../redux/slices/ticketSlice'
 import { getCategories } from '../redux/slices/categorySlice'
 import { PRIORITY_OPTIONS, API_CONFIG } from '../utils/constants'
-import { mockCategories } from '../data/mockCategories'
 
 const CreateTicket = () => {
   const dispatch = useDispatch()
@@ -20,17 +19,13 @@ const CreateTicket = () => {
   } = useSelector((state) => state.tickets)
   
   const { 
-    categories: apiCategories, 
+    categories, 
     isLoading: categoriesLoading 
   } = useSelector((state) => state.categories)
-  
-  // Use mock categories if API categories are not available
-  const categories = apiCategories && apiCategories.length > 0 ? apiCategories : mockCategories
   
   const [attachments, setAttachments] = useState([])
   const [showSuccess, setShowSuccess] = useState(false)
   const [dragOver, setDragOver] = useState(false)
-  const [ticketCreated, setTicketCreated] = useState(false)
   
   const {
     register,
@@ -56,7 +51,7 @@ const CreateTicket = () => {
 
   // Handle successful ticket creation
   useEffect(() => {
-    if (ticketSuccess && !ticketLoading && ticketCreated) {
+    if (ticketSuccess && !ticketLoading) {
       setShowSuccess(true)
       
       // Clear form and attachments
@@ -66,11 +61,10 @@ const CreateTicket = () => {
       // Hide success message and redirect after 3 seconds
       setTimeout(() => {
         setShowSuccess(false)
-        setTicketCreated(false)
         navigate('/tickets')
       }, 3000)
     }
-  }, [ticketSuccess, ticketLoading, ticketCreated, reset, navigate])
+  }, [ticketSuccess, ticketLoading, reset, navigate])
 
   const handleFileUpload = (files) => {
     const newFiles = Array.from(files).filter(file => {
@@ -121,10 +115,8 @@ const CreateTicket = () => {
     }
 
     try {
-      setTicketCreated(true) // Set flag before making the API call
       await dispatch(createTicket(formData)).unwrap()
     } catch (error) {
-      setTicketCreated(false) // Reset flag on error
       console.error('Failed to create ticket:', error)
     }
   }

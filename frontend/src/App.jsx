@@ -22,6 +22,9 @@ import Profile from './pages/Profile'
 import UserList from './pages/UserList'
 import CategoryList from './pages/CategoryList'
 
+// Demo Components
+import CreateTicketDemo from './components/CreateTicketDemo'
+
 // Utils
 import { ROUTES } from './utils/constants'
 
@@ -67,6 +70,9 @@ function App() {
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={<Navigate to={ROUTES.DASHBOARD} replace />} />
+        
+        {/* Create Ticket Demo Route - Accessible without authentication */}
+        <Route path="/create-ticket-demo" element={<CreateTicketDemo />} />
         
         <Route path="/auth" element={<AuthLayout />}>
           <Route path="login" element={
