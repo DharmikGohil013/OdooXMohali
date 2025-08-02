@@ -7,7 +7,7 @@ const Layout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex h-screen bg-blue-50">
       {/* Sidebar */}
       <Sidebar 
         open={sidebarOpen} 
@@ -19,13 +19,9 @@ const Layout = () => {
         {/* Header */}
         <Header onMenuClick={() => setSidebarOpen(true)} />
         
-        {/* Page Content */}
+        {/* Page Content - No padding/margins, flush alignment */}
         <main className="flex-1 overflow-y-auto">
-          <div className="py-6">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
-              <Outlet />
-            </div>
-          </div>
+          <Outlet />
         </main>
       </div>
     </div>
