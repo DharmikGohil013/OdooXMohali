@@ -8,6 +8,7 @@ import {
   getAgents,
   getUserStats
 } from '../controllers/userController.js';
+// importing authMiddleware
 import { protect, authorize } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
