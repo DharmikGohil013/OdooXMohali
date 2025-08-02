@@ -44,14 +44,14 @@ const Dashboard = () => {
   const GlassCard = ({ children, className = "", title, icon: Icon }) => (
     <div className={`bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-blue-100 transform transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] ${className}`}>
       {title && (
-        <div className="p-6 pb-4 border-b border-blue-100">
+        <div className="p-6 pb-3 border-b border-blue-100">
           <div className="flex items-center">
-            {Icon && <Icon className="w-5 h-5 text-blue-600 mr-3" />}
+            {Icon && <Icon className="w-5 h-5 text-blue-600 mr-2" />}
             <h2 className="text-lg font-semibold text-blue-900">{title}</h2>
           </div>
         </div>
       )}
-      <div className={title ? "p-6 pt-4" : "p-6"}>
+      <div className={title ? "p-6 pt-3" : "p-6"}>
         {children}
       </div>
     </div>
@@ -62,7 +62,7 @@ const Dashboard = () => {
     <GlassCard className="group cursor-pointer">
       <div className="flex items-center justify-between">
         <div className="flex-1">
-          <div className="flex items-center mb-2">
+          <div className="flex items-center mb-1">
             <div className={`p-2 rounded-lg bg-gradient-to-br ${
               color === 'blue' ? 'from-blue-500 to-blue-600' :
               color === 'yellow' ? 'from-blue-400 to-blue-500' :
@@ -71,14 +71,14 @@ const Dashboard = () => {
             } shadow-lg`}>
               <Icon className="w-5 h-5 text-white" />
             </div>
-            <div className="ml-3">
+            <div className="ml-2">
               <p className="text-sm font-medium text-blue-600">{title}</p>
             </div>
           </div>
           <div className="flex items-baseline">
             <p className="text-2xl font-bold text-blue-900">{value}</p>
             {change && (
-              <span className={`ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+              <span className={`ml-1 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                 trend === 'up' ? 'bg-blue-100 text-blue-800' : 
                 trend === 'down' ? 'bg-blue-200 text-blue-900' : 
                 'bg-blue-50 text-blue-700'
@@ -99,14 +99,14 @@ const Dashboard = () => {
   const QuickActionButton = ({ to, icon: Icon, title, description, gradient }) => (
     <Link
       to={to}
-      className="block p-6 bg-white/70 backdrop-blur-sm rounded-xl border border-blue-100 hover:bg-white/80 hover:border-blue-200 transition-all duration-200 group transform hover:scale-[1.02] hover:shadow-lg"
+      className="flex items-center p-3 bg-white/70 backdrop-blur-sm rounded-xl border border-blue-100 hover:bg-white/80 hover:border-blue-200 transition-all duration-200 group transform hover:scale-[1.02] hover:shadow-lg w-full"
     >
-      <div className="text-center">
-        <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
-          <Icon className="w-6 h-6 text-white" />
-        </div>
-        <h3 className="font-semibold text-blue-900 mb-2">{title}</h3>
-        <p className="text-sm text-blue-600">{description}</p>
+      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-200 flex-shrink-0">
+        <Icon className="w-4 h-4 text-white" />
+      </div>
+      <div className="ml-3 flex-1">
+        <h3 className="font-semibold text-blue-900 text-sm">{title}</h3>
+        <p className="text-xs text-blue-600 mt-0.5">{description}</p>
       </div>
     </Link>
   )
@@ -114,7 +114,6 @@ const Dashboard = () => {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-blue-50 flex items-center justify-center">
-        {/* Background Pattern */}
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute -top-40 -right-40 w-80 h-80 rounded-full bg-gradient-to-br from-blue-400/10 to-blue-600/10 blur-3xl"></div>
           <div className="absolute -bottom-40 -left-40 w-80 h-80 rounded-full bg-gradient-to-tr from-blue-400/10 to-blue-600/10 blur-3xl"></div>
@@ -163,22 +162,21 @@ const Dashboard = () => {
   
   return (
     <div className="min-h-screen bg-blue-50">
-      {/* Background Pattern */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 -right-40 w-80 h-80 rounded-full bg-gradient-to-br from-blue-400/10 to-blue-600/10 blur-3xl"></div>
         <div className="absolute -bottom-40 -left-40 w-80 h-80 rounded-full bg-gradient-to-tr from-blue-400/10 to-blue-600/10 blur-3xl"></div>
       </div>
       
-      <div className="relative p-6 space-y-8">
+      <div className="relative p-4 lg:p-6 space-y-4">
         {/* Header Section */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-4">
           <div className="flex items-center">
             <Logo />
-            <div className="ml-4">
-              <h1 className="text-2xl font-bold text-blue-900">
+            <div className="ml-3">
+              <h1 className="text-xl lg:text-2xl font-bold text-blue-900">
                 Welcome back, {user?.name}! 👋
               </h1>
-              <p className="text-blue-600 mt-1">
+              <p className="text-blue-600 mt-1 text-sm lg:text-base">
                 Here's what's happening with your tickets today
               </p>
             </div>
@@ -198,7 +196,7 @@ const Dashboard = () => {
         </div>
         
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
           {statCards.map((stat, index) => (
             <StatCard
               key={index}
@@ -213,15 +211,14 @@ const Dashboard = () => {
         </div>
         
         {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-5">
           {/* Status & Priority Cards */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Status Breakdown */}
+          <div className="lg:col-span-2 flex justify-center space-x-4">
             {stats?.statusStats && (
-              <GlassCard title="Ticket Status Overview" icon={FiTag}>
-                <div className="grid grid-cols-2 gap-4">
+              <GlassCard title="Ticket Status Overview" icon={FiTag} className="w-1/2">
+                <div className="grid grid-cols-2 gap-2">
                   {Object.entries(stats.statusStats).map(([status, count]) => (
-                    <div key={status} className="p-4 bg-white/70 rounded-xl border border-blue-100">
+                    <div key={status} className="p-3 bg-white/70 rounded-xl border border-blue-100">
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-sm font-medium text-blue-600 capitalize">
@@ -240,16 +237,14 @@ const Dashboard = () => {
                 </div>
               </GlassCard>
             )}
-            
-            {/* Priority Breakdown */}
             {stats?.priorityStats && (
-              <GlassCard title="Priority Distribution" icon={FiAlertTriangle}>
-                <div className="space-y-3">
+              <GlassCard title="Priority Distribution" icon={FiAlertTriangle} className="w-1/2">
+                <div className="grid grid-cols-2 gap-2">
                   {Object.entries(stats.priorityStats).map(([priority, count]) => (
-                    <div key={priority} className="flex items-center justify-between p-3 bg-white/70 rounded-lg border border-blue-100">
+                    <div key={priority} className="flex items-center justify-between p-2 bg-white/70 rounded-lg border border-blue-100">
                       <div className="flex items-center">
-                        {priority === 'urgent' && <FiAlertTriangle className="mr-3 text-blue-600" size={16} />}
-                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium capitalize ${
+                        {priority === 'urgent' && <FiAlertTriangle className="mr-1 text-blue-600" size={14} />}
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium capitalize ${
                           priority === 'urgent' ? 'bg-blue-200 text-blue-800' :
                           priority === 'high' ? 'bg-blue-100 text-blue-700' :
                           priority === 'medium' ? 'bg-blue-50 text-blue-600' : 'bg-blue-50 text-blue-500'
@@ -265,10 +260,10 @@ const Dashboard = () => {
             )}
           </div>
           
-          {/* Quick Actions Sidebar */}
-          <div className="space-y-6">
-            <GlassCard title="Quick Actions" icon={FiPlus}>
-              <div className="space-y-4">
+          {/* Quick Actions and Recent Activity */}
+          <div className="lg:col-span-2 flex justify-center space-x-4">
+            <GlassCard title="Quick Actions" icon={FiPlus} className="w-1/2">
+              <div className="grid grid-cols-1 gap-2">
                 <QuickActionButton
                   to="/tickets/new"
                   icon={FiPlus}
@@ -292,29 +287,34 @@ const Dashboard = () => {
                 />
               </div>
             </GlassCard>
-            
-            {/* Recent Activity Card */}
-            <GlassCard title="Recent Activity" icon={FiClock}>
-              <div className="space-y-3">
-                <div className="flex items-center p-3 bg-white/70 rounded-lg border border-blue-100">
-                  <div className="w-2 h-2 bg-blue-600 rounded-full mr-3"></div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-blue-900">Ticket #1234 resolved</p>
+            <GlassCard title="Recent Activity" icon={FiClock} className="w-1/2">
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                <div className="flex items-center p-2 bg-white/70 rounded-lg border border-blue-100">
+                  <div className="w-2 h-2 bg-blue-600 rounded-full mr-2 flex-shrink-0"></div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-blue-900 truncate">Ticket #1234 resolved</p>
                     <p className="text-xs text-blue-500">2 minutes ago</p>
                   </div>
                 </div>
-                <div className="flex items-center p-3 bg-white/70 rounded-lg border border-blue-100">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full mr-3"></div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-blue-900">New ticket created</p>
+                <div className="flex items-center p-2 bg-white/70 rounded-lg border border-blue-100">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full mr-2 flex-shrink-0"></div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-blue-900 truncate">New ticket created</p>
                     <p className="text-xs text-blue-500">15 minutes ago</p>
                   </div>
                 </div>
-                <div className="flex items-center p-3 bg-white/70 rounded-lg border border-blue-100">
-                  <div className="w-2 h-2 bg-blue-400 rounded-full mr-3"></div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-blue-900">Ticket #1232 updated</p>
+                <div className="flex items-center p-2 bg-white/70 rounded-lg border border-blue-100">
+                  <div className="w-2 h-2 bg-blue-400 rounded-full mr-2 flex-shrink-0"></div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-blue-900 truncate">Ticket #1232 updated</p>
                     <p className="text-xs text-blue-500">1 hour ago</p>
+                  </div>
+                </div>
+                <div className="flex items-center p-2 bg-white/70 rounded-lg border border-blue-100">
+                  <div className="w-2 h-2 bg-blue-300 rounded-full mr-2 flex-shrink-0"></div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-blue-900 truncate">Ticket #1230 assigned</p>
+                    <p className="text-xs text-blue-500">2 hours ago</p>
                   </div>
                 </div>
               </div>
@@ -323,7 +323,7 @@ const Dashboard = () => {
         </div>
         
         {/* Footer */}
-        <div className="text-center pt-8">
+        <div className="text-center pt-4">
           <p className="text-sm text-blue-500">
             © 2024 QuickDesk. All rights reserved.
           </p>
