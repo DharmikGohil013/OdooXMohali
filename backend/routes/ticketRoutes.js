@@ -7,7 +7,10 @@ import {
   deleteTicket,
   addComment,
   rateTicket,
-  getTicketStats
+  getTicketStats,
+  assignTicket,
+  closeTicket,
+  reopenTicket
 } from '../controllers/ticketController.js';
 import { protect, authorize } from '../middleware/authMiddleware.js';
 import { uploadMultiple } from '../middleware/uploadMiddleware.js';
@@ -29,6 +32,9 @@ router.delete('/:id', authorize('admin'), deleteTicket);
 
 // Ticket actions
 router.post('/:id/comments', addComment);
-router.post('/:id/rate', rateTicket);
+router.put('/:id/rate', rateTicket);
+router.put('/:id/assign', authorize('admin', 'agent'), assignTicket);
+router.put('/:id/close', closeTicket);
+router.put('/:id/reopen', reopenTicket);
 
 export default router;

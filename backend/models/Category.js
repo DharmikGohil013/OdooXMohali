@@ -31,8 +31,7 @@ const categorySchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Index for better query performance
-categorySchema.index({ name: 1 });
+// Index for better query performance (name index is created by unique: true)
 categorySchema.index({ isActive: 1 });
 
 const Category = mongoose.model('Category', categorySchema);

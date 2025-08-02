@@ -152,8 +152,7 @@ ticketSchema.pre('save', function(next) {
   next();
 });
 
-// Indexes for better query performance
-ticketSchema.index({ ticketId: 1 });
+// Indexes for better query performance (ticketId index is created by unique: true)
 ticketSchema.index({ createdBy: 1 });
 ticketSchema.index({ assignedTo: 1 });
 ticketSchema.index({ status: 1 });

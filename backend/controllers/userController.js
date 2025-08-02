@@ -251,3 +251,177 @@ export const getUserStats = asyncHandler(async (req, res) => {
     }
   });
 });
+
+/**
+ * @desc    Activate/Deactivate user (Admin only)
+ * @route   PUT /api/users/:id/toggle-status
+ * @access  Private/Admin
+ */
+export const toggleUserStatus = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.params.id);
+
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      message: 'User not found'
+    });
+  }
+
+  // Don't allow deactivating admins
+  if (user.role === 'admin' && user.isActive) {
+    return res.status(400).json({
+      success: false,
+      message: 'Cannot deactivate admin users'
+    });
+  }
+
+  user.isActive = !user.isActive;
+  await user.save();
+
+  res.json({
+    success: true,
+    message: `User ${user.isActive ? 'activated' : 'deactivated'} successfully`,
+    data: {
+      user: user.getPublicProfile()
+    }
+  });
+});
+
+/**
+ * @desc    Change user role (Admin only)
+ * @route   PUT /api/users/:id/role
+ * @access  Private/Admin
+ */
+export const changeUserRole = asyncHandler(async (req, res) => {
+  const { role } = req.body;
+
+  if (!['user', 'agent', 'admin'].includes(role)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid role. Must be user, agent, or admin'
+    });
+  }
+
+  const user = await User.findById(req.params.id);
+
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      message: 'User not found'
+    });
+  }
+
+  // Don't allow changing your own role
+  if (user._id.toString() === req.user.id) {
+    return res.status(400).json({
+      success: false,
+      message: 'Cannot change your own role'
+    });
+  }
+
+  user.role = role;
+  await user.save();
+
+  res.json({
+    success: true,
+    message: 'User role updated successfully',
+    data: {
+      user: user.getPublicProfile()
+    }
+  });
+});
+
+/**
+ * @desc    Get user activity/tickets
+ * @route   GET /api/users/:id/activity
+ * @access  Private/Admin
+ */
+export const getUserActivity = asyncHandler(async (req, res) => {
+  const userId = req.params.id;
+
+  const user = await User.findById(userId).select('-password');
+  
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      message: 'User not found'
+    });
+  }
+
+  // Import here to avoid circular dependency
+  const Ticket = (await import('../models/Ticket.js')).default;
+
+  const [
+    ticketsCreated,
+    ticketsAssigned,
+    ticketsResolved,
+    recentActivity
+  ] = await Promise.all([
+    // Tickets created by user
+    Ticket.countDocuments({ createdBy: userId }),
+    
+    // Tickets assigned to user (for agents)
+    Ticket.countDocuments({ assignedTo: userId }),
+    
+    // Tickets resolved by user
+    Ticket.countDocuments({ resolvedBy: userId }),
+    
+    // Recent tickets (created or assigned)
+    Ticket.find({
+      $or: [
+        { createdBy: userId },
+        { assignedTo: userId }
+      ]
+    })
+    .populate('category', 'name color')
+    .sort({ updatedAt: -1 })
+    .limit(10)
+    .select('ticketId title status priority createdAt updatedAt')
+  ]);
+
+  res.json({
+    success: true,
+    data: {
+      user: user.getPublicProfile(),
+      activity: {
+        ticketsCreated,
+        ticketsAssigned,
+        ticketsResolved,
+        recentActivity
+      }
+    }
+  });
+});
+
+/**
+ * @desc    Reset user password (Admin only)
+ * @route   PUT /api/users/:id/reset-password
+ * @access  Private/Admin
+ */
+export const resetUserPassword = asyncHandler(async (req, res) => {
+  const { newPassword } = req.body;
+
+  if (!newPassword || newPassword.length < 6) {
+    return res.status(400).json({
+      success: false,
+      message: 'Password must be at least 6 characters long'
+    });
+  }
+
+  const user = await User.findById(req.params.id);
+
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      message: 'User not found'
+    });
+  }
+
+  user.password = newPassword;
+  await user.save();
+
+  res.json({
+    success: true,
+    message: 'Password reset successfully'
+  });
+});
