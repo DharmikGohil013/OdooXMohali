@@ -1,7 +1,52 @@
 import Ticket from '../models/Ticket.js';
 import User from '../models/User.js';
-import Category from '../models/Category.js';
 import { asyncHandler } from '../middleware/errorMiddleware.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+/**
+ * Calculate storage usage from uploads directory
+ */
+const calculateStorageUsage = async () => {
+  try {
+    const uploadsPath = path.join(__dirname, '..', 'uploads');
+    
+    if (!fs.existsSync(uploadsPath)) {
+      return { totalSize: 0, fileCount: 0 };
+    }
+
+    const files = fs.readdirSync(uploadsPath);
+    let totalSize = 0;
+    let fileCount = 0;
+
+    for (const file of files) {
+      try {
+        const filePath = path.join(uploadsPath, file);
+        const stats = fs.statSync(filePath);
+        if (stats.isFile()) {
+          totalSize += stats.size;
+          fileCount++;
+        }
+      } catch (error) {
+        // Skip files that can't be accessed
+        continue;
+      }
+    }
+
+    return { 
+      totalSize: Math.round(totalSize / (1024 * 1024) * 100) / 100, // MB with 2 decimal places
+      fileCount,
+      totalSizeBytes: totalSize
+    };
+  } catch (error) {
+    console.error('Error calculating storage:', error);
+    return { totalSize: 0, fileCount: 0, totalSizeBytes: 0 };
+  }
+};
 
 /**
  * @desc    Get dashboard statistics
@@ -21,14 +66,20 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
         totalTickets,
         openTickets,
         inProgressTickets,
+        pendingTickets,
         resolvedTickets,
+        closedTickets,
         totalUsers,
-        totalCategories,
+        activeUsers,
         urgentTickets,
+        highPriorityTickets,
         ticketsByStatus,
         ticketsByPriority,
+        ticketsByCategory,
         recentTickets,
-        ticketTrends
+        recentUsers,
+        ticketTrends,
+        storageInfo
       ] = await Promise.all([
         // Total tickets
         Ticket.countDocuments(),
@@ -39,17 +90,32 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
         // In progress tickets
         Ticket.countDocuments({ status: 'in-progress' }),
         
+        // Pending tickets (open + in-progress)
+        Ticket.countDocuments({ status: { $in: ['open', 'in-progress'] } }),
+        
         // Resolved tickets
         Ticket.countDocuments({ status: 'resolved' }),
         
-        // Total users
-        User.countDocuments({ role: 'user' }),
+        // Closed tickets
+        Ticket.countDocuments({ status: 'closed' }),
         
-        // Total categories
-        Category.countDocuments(),
+        // Total users (all roles)
+        User.countDocuments(),
         
-        // Urgent tickets
-        Ticket.countDocuments({ priority: 'urgent', status: { $ne: 'resolved' } }),
+        // Active users
+        User.countDocuments({ isActive: true }),
+        
+        // Urgent tickets (not resolved/closed)
+        Ticket.countDocuments({ 
+          priority: 'urgent', 
+          status: { $nin: ['resolved', 'closed'] } 
+        }),
+        
+        // High priority tickets (not resolved/closed)
+        Ticket.countDocuments({ 
+          priority: 'high', 
+          status: { $nin: ['resolved', 'closed'] } 
+        }),
         
         // Tickets by status
         Ticket.aggregate([
@@ -71,20 +137,199 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
           }
         ]),
         
-        // Recent tickets (last 5)
-        Ticket.find()
-          .populate('createdBy', 'name email')
-          .populate('category', 'name color')
-          .sort({ createdAt: -1 })
-          .limit(5)
-          .select('ticketId title status priority createdAt'),
+        // Tickets by category
+        Ticket.aggregate([
+          {
+            $group: {
+              _id: '$category',
+              count: { $sum: 1 }
+            }
+          },
+          {
+            $sort: { count: -1 }
+          }
+        ]),
         
-        // Ticket trends (last 7 days)
+        // Recent tickets (last 10)
+        Ticket.find()
+          .populate('createdBy', 'name email role department')
+          .populate('assignedTo', 'name email role')
+          .sort({ createdAt: -1 })
+          .limit(10)
+          .select('_id ticketId title status priority category createdAt updatedAt')
+          .lean(),
+        
+        // Recent users (last 10 registered)
+        User.find()
+          .sort({ createdAt: -1 })
+          .limit(10)
+          .select('_id name email role department isActive createdAt lastLogin')
+          .lean(),
+        
+        // Ticket trends (last 30 days)
         Ticket.aggregate([
           {
             $match: {
               createdAt: {
-                $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+                $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+              }
+            }
+          },
+          {
+            $group: {
+              _id: {
+                $dateToString: { format: "%Y-%m-%d", date: "$createdAt" }
+              },
+              count: { $sum: 1 }
+            }
+          },
+          {
+            $sort: { _id: 1 }
+          }
+        ]),
+        
+        // Storage calculation
+        calculateStorageUsage()
+      ]);
+
+      // Normalize aggregation results with defaults
+      const statusDistribution = {
+        open: 0,
+        'in-progress': 0,
+        pending: 0,
+        resolved: 0,
+        closed: 0
+      };
+      
+      ticketsByStatus.forEach(item => {
+        statusDistribution[item._id] = item.count;
+      });
+
+      const priorityDistribution = {
+        low: 0,
+        medium: 0,
+        high: 0,
+        urgent: 0
+      };
+      
+      ticketsByPriority.forEach(item => {
+        priorityDistribution[item._id] = item.count;
+      });
+
+      const categoryDistribution = ticketsByCategory.reduce((acc, item) => {
+        acc[item._id] = item.count;
+        return acc;
+      }, {});
+
+      stats = {
+        overview: {
+          totalTickets: totalTickets || 0,
+          openTickets: openTickets || 0,
+          inProgressTickets: inProgressTickets || 0,
+          pendingTickets: pendingTickets || 0,
+          resolvedTickets: resolvedTickets || 0,
+          closedTickets: closedTickets || 0,
+          totalUsers: totalUsers || 0,
+          activeUsers: activeUsers || 0,
+          urgentTickets: urgentTickets || 0,
+          highPriorityTickets: highPriorityTickets || 0,
+          storageUsed: storageInfo.totalSize || 0, // in MB
+          totalFiles: storageInfo.fileCount || 0
+        },
+        distribution: {
+          byStatus: statusDistribution,
+          byPriority: priorityDistribution,
+          byCategory: categoryDistribution
+        },
+        recentActivity: {
+          tickets: recentTickets || [],
+          users: recentUsers || []
+        },
+        trends: {
+          tickets: ticketTrends || [],
+          period: '30 days'
+        },
+        storage: {
+          used: storageInfo.totalSize || 0, // MB
+          usedBytes: storageInfo.totalSizeBytes || 0,
+          fileCount: storageInfo.fileCount || 0,
+          limit: 500, // 500 MB limit (configurable)
+          percentage: storageInfo.totalSize ? Math.round((storageInfo.totalSize / 500) * 100) : 0
+        }
+      };
+
+    } else {
+      // User dashboard stats
+      const [
+        myTickets,
+        myOpenTickets,
+        myInProgressTickets,
+        myPendingTickets,
+        myResolvedTickets,
+        myClosedTickets,
+        myTicketsByStatus,
+        myTicketsByPriority,
+        myRecentTickets,
+        myTicketTrends
+      ] = await Promise.all([
+        // My total tickets
+        Ticket.countDocuments({ createdBy: userId }),
+        
+        // My open tickets
+        Ticket.countDocuments({ createdBy: userId, status: 'open' }),
+        
+        // My in progress tickets
+        Ticket.countDocuments({ createdBy: userId, status: 'in-progress' }),
+        
+        // My pending tickets
+        Ticket.countDocuments({ 
+          createdBy: userId, 
+          status: { $in: ['open', 'in-progress'] } 
+        }),
+        
+        // My resolved tickets
+        Ticket.countDocuments({ createdBy: userId, status: 'resolved' }),
+        
+        // My closed tickets
+        Ticket.countDocuments({ createdBy: userId, status: 'closed' }),
+        
+        // My tickets by status
+        Ticket.aggregate([
+          { $match: { createdBy: userId } },
+          {
+            $group: {
+              _id: '$status',
+              count: { $sum: 1 }
+            }
+          }
+        ]),
+        
+        // My tickets by priority
+        Ticket.aggregate([
+          { $match: { createdBy: userId } },
+          {
+            $group: {
+              _id: '$priority',
+              count: { $sum: 1 }
+            }
+          }
+        ]),
+        
+        // My recent tickets
+        Ticket.find({ createdBy: userId })
+          .populate('assignedTo', 'name email role')
+          .sort({ createdAt: -1 })
+          .limit(10)
+          .select('_id ticketId title status priority category createdAt updatedAt')
+          .lean(),
+        
+        // My ticket trends (last 30 days)
+        Ticket.aggregate([
+          {
+            $match: {
+              createdBy: userId,
+              createdAt: {
+                $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
               }
             }
           },
@@ -102,86 +347,50 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
         ])
       ]);
 
-      stats = {
-        overview: {
-          totalTickets,
-          openTickets,
-          inProgressTickets,
-          resolvedTickets,
-          totalUsers,
-          totalCategories,
-          urgentTickets
-        },
-        distribution: {
-          byStatus: ticketsByStatus.reduce((acc, item) => {
-            acc[item._id] = item.count;
-            return acc;
-          }, {}),
-          byPriority: ticketsByPriority.reduce((acc, item) => {
-            acc[item._id] = item.count;
-            return acc;
-          }, {})
-        },
-        recentActivity: recentTickets,
-        trends: ticketTrends
+      // Normalize user stats
+      const myStatusDistribution = {
+        open: 0,
+        'in-progress': 0,
+        pending: 0,
+        resolved: 0,
+        closed: 0
       };
+      
+      myTicketsByStatus.forEach(item => {
+        myStatusDistribution[item._id] = item.count;
+      });
 
-    } else {
-      // User dashboard stats
-      const [
-        myTickets,
-        myOpenTickets,
-        myInProgressTickets,
-        myResolvedTickets,
-        myTicketsByStatus,
-        myRecentTickets
-      ] = await Promise.all([
-        // My total tickets
-        Ticket.countDocuments({ createdBy: userId }),
-        
-        // My open tickets
-        Ticket.countDocuments({ createdBy: userId, status: 'open' }),
-        
-        // My in progress tickets
-        Ticket.countDocuments({ createdBy: userId, status: 'in-progress' }),
-        
-        // My resolved tickets
-        Ticket.countDocuments({ createdBy: userId, status: 'resolved' }),
-        
-        // My tickets by status
-        Ticket.aggregate([
-          { $match: { createdBy: userId } },
-          {
-            $group: {
-              _id: '$status',
-              count: { $sum: 1 }
-            }
-          }
-        ]),
-        
-        // My recent tickets
-        Ticket.find({ createdBy: userId })
-          .populate('category', 'name color')
-          .populate('assignedTo', 'name')
-          .sort({ createdAt: -1 })
-          .limit(5)
-          .select('ticketId title status priority createdAt')
-      ]);
+      const myPriorityDistribution = {
+        low: 0,
+        medium: 0,
+        high: 0,
+        urgent: 0
+      };
+      
+      myTicketsByPriority.forEach(item => {
+        myPriorityDistribution[item._id] = item.count;
+      });
 
       stats = {
         overview: {
-          myTickets,
-          myOpenTickets,
-          myInProgressTickets,
-          myResolvedTickets
+          myTickets: myTickets || 0,
+          myOpenTickets: myOpenTickets || 0,
+          myInProgressTickets: myInProgressTickets || 0,
+          myPendingTickets: myPendingTickets || 0,
+          myResolvedTickets: myResolvedTickets || 0,
+          myClosedTickets: myClosedTickets || 0
         },
         distribution: {
-          byStatus: myTicketsByStatus.reduce((acc, item) => {
-            acc[item._id] = item.count;
-            return acc;
-          }, {})
+          byStatus: myStatusDistribution,
+          byPriority: myPriorityDistribution
         },
-        recentActivity: myRecentTickets
+        recentActivity: {
+          tickets: myRecentTickets || []
+        },
+        trends: {
+          tickets: myTicketTrends || [],
+          period: '30 days'
+        }
       };
     }
 
@@ -194,7 +403,8 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
     console.error('Dashboard stats error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching dashboard statistics'
+      message: 'Error fetching dashboard statistics',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
@@ -256,13 +466,14 @@ export const getTicketAnalytics = asyncHandler(async (req, res) => {
       {
         $match: {
           status: 'resolved',
-          updatedAt: { $gte: startDate }
+          updatedAt: { $gte: startDate },
+          resolvedAt: { $exists: true }
         }
       },
       {
         $addFields: {
           resolutionTime: {
-            $subtract: ["$updatedAt", "$createdAt"]
+            $subtract: ["$resolvedAt", "$createdAt"]
           }
         }
       },
@@ -275,7 +486,7 @@ export const getTicketAnalytics = asyncHandler(async (req, res) => {
       }
     ]),
 
-    // Tickets by category
+    // Tickets by category (using category names directly)
     Ticket.aggregate([
       {
         $match: {
@@ -283,34 +494,80 @@ export const getTicketAnalytics = asyncHandler(async (req, res) => {
         }
       },
       {
-        $lookup: {
-          from: 'categories',
-          localField: 'category',
-          foreignField: '_id',
-          as: 'categoryInfo'
-        }
-      },
-      {
         $group: {
           _id: '$category',
-          count: { $sum: 1 },
-          categoryName: { $first: { $arrayElemAt: ['$categoryInfo.name', 0] } }
+          count: { $sum: 1 }
         }
       },
       {
         $sort: { count: -1 }
       }
+    ]),
+
+    // Agent performance (tickets assigned and resolved)
+    Ticket.aggregate([
+      {
+        $match: {
+          assignedTo: { $exists: true },
+          updatedAt: { $gte: startDate }
+        }
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'assignedTo',
+          foreignField: '_id',
+          as: 'agent'
+        }
+      },
+      {
+        $unwind: '$agent'
+      },
+      {
+        $group: {
+          _id: '$assignedTo',
+          agentName: { $first: '$agent.name' },
+          totalAssigned: { $sum: 1 },
+          resolved: {
+            $sum: { $cond: [{ $eq: ['$status', 'resolved'] }, 1, 0] }
+          }
+        }
+      },
+      {
+        $addFields: {
+          resolutionRate: {
+            $cond: [
+              { $eq: ['$totalAssigned', 0] },
+              0,
+              { $multiply: [{ $divide: ['$resolved', '$totalAssigned'] }, 100] }
+            ]
+          }
+        }
+      },
+      {
+        $sort: { resolutionRate: -1 }
+      }
     ])
   ]);
+
+  // Convert resolution time from milliseconds to hours
+  const avgResolutionData = analytics[2][0];
+  const avgResolutionHours = avgResolutionData ? 
+    Math.round((avgResolutionData.avgResolutionTime / (1000 * 60 * 60)) * 100) / 100 : 0;
 
   res.json({
     success: true,
     data: {
       period: `${days} days`,
-      ticketsCreated: analytics[0],
-      ticketsResolved: analytics[1],
-      avgResolutionTime: analytics[2][0] || { avgResolutionTime: 0, count: 0 },
-      ticketsByCategory: analytics[3]
+      ticketsCreated: analytics[0] || [],
+      ticketsResolved: analytics[1] || [],
+      avgResolutionTime: {
+        hours: avgResolutionHours,
+        milliseconds: avgResolutionData?.avgResolutionTime || 0,
+        ticketCount: avgResolutionData?.count || 0
+      },
+      ticketsByCategory: analytics[3] || [],
+      agentPerformance: analytics[4] || []
     }
   });
 });

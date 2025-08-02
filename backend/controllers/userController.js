@@ -1,5 +1,7 @@
 import User from '../models/User.js';
+import Ticket from '../models/Ticket.js';
 import { asyncHandler } from '../middleware/errorMiddleware.js';
+import mongoose from 'mongoose';
 
 /**
  * @desc    Get all users (Admin only)
@@ -36,14 +38,35 @@ export const getUsers = asyncHandler(async (req, res) => {
     .select('-password -resetPasswordToken -resetPasswordExpire')
     .sort({ createdAt: -1 })
     .limit(limit)
-    .skip(skip);
+    .skip(skip)
+    .lean();
+
+  // Add ticket counts for each user
+  const usersWithTicketCounts = await Promise.all(
+    users.map(async (user) => {
+      const [totalTickets, openTickets, resolvedTickets] = await Promise.all([
+        Ticket.countDocuments({ createdBy: user._id }),
+        Ticket.countDocuments({ createdBy: user._id, status: { $in: ['open', 'in-progress'] } }),
+        Ticket.countDocuments({ createdBy: user._id, status: 'resolved' })
+      ]);
+
+      return {
+        ...user,
+        ticketStats: {
+          total: totalTickets,
+          open: openTickets,
+          resolved: resolvedTickets
+        }
+      };
+    })
+  );
 
   const total = await User.countDocuments(query);
 
   res.json({
     success: true,
     data: {
-      users,
+      users: usersWithTicketCounts,
       pagination: {
         page,
         limit,
@@ -61,7 +84,8 @@ export const getUsers = asyncHandler(async (req, res) => {
  */
 export const getUserById = asyncHandler(async (req, res) => {
   const user = await User.findById(req.params.id)
-    .select('-password -resetPasswordToken -resetPasswordExpire');
+    .select('-password -resetPasswordToken -resetPasswordExpire')
+    .lean();
 
   if (!user) {
     return res.status(404).json({
@@ -70,10 +94,53 @@ export const getUserById = asyncHandler(async (req, res) => {
     });
   }
 
+  // Get user's ticket summary
+  const [ticketStats, recentTickets] = await Promise.all([
+    Ticket.aggregate([
+      { $match: { createdBy: user._id } },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: 1 },
+          open: { $sum: { $cond: [{ $eq: ['$status', 'open'] }, 1, 0] } },
+          inProgress: { $sum: { $cond: [{ $eq: ['$status', 'in-progress'] }, 1, 0] } },
+          resolved: { $sum: { $cond: [{ $eq: ['$status', 'resolved'] }, 1, 0] } },
+          closed: { $sum: { $cond: [{ $eq: ['$status', 'closed'] }, 1, 0] } }
+        }
+      }
+    ]),
+    
+    Ticket.find({ createdBy: user._id })
+      .populate('assignedTo', 'name email')
+      .sort({ createdAt: -1 })
+      .limit(3)
+      .select('_id ticketId title status priority createdAt')
+      .lean()
+  ]);
+
+  const stats = ticketStats[0] || {
+    total: 0,
+    open: 0,
+    inProgress: 0,
+    resolved: 0,
+    closed: 0
+  };
+
   res.json({
     success: true,
     data: {
-      user
+      user: {
+        ...user,
+        ticketStats: {
+          total: stats.total,
+          open: stats.open,
+          inProgress: stats.inProgress,
+          pending: stats.open + stats.inProgress,
+          resolved: stats.resolved,
+          closed: stats.closed
+        }
+      },
+      recentTickets: recentTickets || []
     }
   });
 });
@@ -423,5 +490,290 @@ export const resetUserPassword = asyncHandler(async (req, res) => {
   res.json({
     success: true,
     message: 'Password reset successfully'
+  });
+});
+
+/**
+ * @desc    Get all tickets for a specific user (Admin only)
+ * @route   GET /api/users/:id/tickets
+ * @access  Private/Admin
+ */
+export const getUserTickets = asyncHandler(async (req, res) => {
+  const userId = req.params.id;
+  
+  // Validate user ID format
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid user ID format'
+    });
+  }
+
+  // Check if user exists
+  const user = await User.findById(userId).select('name email role department');
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      message: 'User not found'
+    });
+  }
+
+  // Pagination
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+  const skip = (page - 1) * limit;
+
+  // Build query for user's tickets
+  let query = { createdBy: userId };
+
+  // Filter by status
+  if (req.query.status) {
+    query.status = req.query.status;
+  }
+
+  // Filter by priority
+  if (req.query.priority) {
+    query.priority = req.query.priority;
+  }
+
+  // Filter by category
+  if (req.query.category) {
+    query.category = req.query.category;
+  }
+
+  // Date range filter
+  if (req.query.startDate || req.query.endDate) {
+    query.createdAt = {};
+    if (req.query.startDate) {
+      query.createdAt.$gte = new Date(req.query.startDate);
+    }
+    if (req.query.endDate) {
+      query.createdAt.$lte = new Date(req.query.endDate);
+    }
+  }
+
+  // Search in title and description
+  if (req.query.search) {
+    query.$or = [
+      { title: { $regex: req.query.search, $options: 'i' } },
+      { description: { $regex: req.query.search, $options: 'i' } },
+      { ticketId: { $regex: req.query.search, $options: 'i' } }
+    ];
+  }
+
+  // Sort options
+  let sortOption = { createdAt: -1 }; // Default: newest first
+  if (req.query.sortBy) {
+    switch (req.query.sortBy) {
+      case 'oldest':
+        sortOption = { createdAt: 1 };
+        break;
+      case 'updated':
+        sortOption = { updatedAt: -1 };
+        break;
+      case 'priority':
+        sortOption = { priority: 1, createdAt: -1 };
+        break;
+      case 'status':
+        sortOption = { status: 1, createdAt: -1 };
+        break;
+      default:
+        sortOption = { createdAt: -1 };
+    }
+  }
+
+  const [tickets, total, ticketStats] = await Promise.all([
+    // Get tickets with pagination
+    Ticket.find(query)
+      .populate('assignedTo', 'name email role')
+      .sort(sortOption)
+      .limit(limit)
+      .skip(skip)
+      .select('_id ticketId title description status priority category createdAt updatedAt attachments tags')
+      .lean(),
+    
+    // Get total count
+    Ticket.countDocuments(query),
+    
+    // Get user's ticket statistics
+    Ticket.aggregate([
+      { $match: { createdBy: new mongoose.Types.ObjectId(userId) } },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: 1 },
+          open: { $sum: { $cond: [{ $eq: ['$status', 'open'] }, 1, 0] } },
+          inProgress: { $sum: { $cond: [{ $eq: ['$status', 'in-progress'] }, 1, 0] } },
+          resolved: { $sum: { $cond: [{ $eq: ['$status', 'resolved'] }, 1, 0] } },
+          closed: { $sum: { $cond: [{ $eq: ['$status', 'closed'] }, 1, 0] } },
+          urgent: { $sum: { $cond: [{ $eq: ['$priority', 'urgent'] }, 1, 0] } },
+          high: { $sum: { $cond: [{ $eq: ['$priority', 'high'] }, 1, 0] } }
+        }
+      }
+    ])
+  ]);
+
+  const stats = ticketStats[0] || {
+    total: 0,
+    open: 0,
+    inProgress: 0,
+    resolved: 0,
+    closed: 0,
+    urgent: 0,
+    high: 0
+  };
+
+  res.json({
+    success: true,
+    data: {
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        department: user.department
+      },
+      tickets,
+      stats: {
+        total: stats.total,
+        open: stats.open,
+        inProgress: stats.inProgress,
+        pending: stats.open + stats.inProgress,
+        resolved: stats.resolved,
+        closed: stats.closed,
+        urgent: stats.urgent,
+        high: stats.high
+      },
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+        hasNext: page < Math.ceil(total / limit),
+        hasPrev: page > 1
+      },
+      filters: {
+        status: req.query.status || null,
+        priority: req.query.priority || null,
+        category: req.query.category || null,
+        search: req.query.search || null,
+        sortBy: req.query.sortBy || 'newest'
+      }
+    }
+  });
+});
+
+/**
+ * @desc    Get user ticket summary (Admin only)
+ * @route   GET /api/users/:id/tickets/summary
+ * @access  Private/Admin
+ */
+export const getUserTicketSummary = asyncHandler(async (req, res) => {
+  const userId = req.params.id;
+  
+  // Validate user ID format
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid user ID format'
+    });
+  }
+
+  // Check if user exists
+  const user = await User.findById(userId).select('name email role department createdAt');
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      message: 'User not found'
+    });
+  }
+
+  const [ticketStats, recentTickets, categoryBreakdown] = await Promise.all([
+    // Overall ticket statistics
+    Ticket.aggregate([
+      { $match: { createdBy: new mongoose.Types.ObjectId(userId) } },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: 1 },
+          open: { $sum: { $cond: [{ $eq: ['$status', 'open'] }, 1, 0] } },
+          inProgress: { $sum: { $cond: [{ $eq: ['$status', 'in-progress'] }, 1, 0] } },
+          resolved: { $sum: { $cond: [{ $eq: ['$status', 'resolved'] }, 1, 0] } },
+          closed: { $sum: { $cond: [{ $eq: ['$status', 'closed'] }, 1, 0] } },
+          urgent: { $sum: { $cond: [{ $eq: ['$priority', 'urgent'] }, 1, 0] } },
+          high: { $sum: { $cond: [{ $eq: ['$priority', 'high'] }, 1, 0] } },
+          medium: { $sum: { $cond: [{ $eq: ['$priority', 'medium'] }, 1, 0] } },
+          low: { $sum: { $cond: [{ $eq: ['$priority', 'low'] }, 1, 0] } }
+        }
+      }
+    ]),
+
+    // Recent tickets (last 5)
+    Ticket.find({ createdBy: userId })
+      .populate('assignedTo', 'name email')
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .select('_id ticketId title status priority category createdAt')
+      .lean(),
+
+    // Tickets by category
+    Ticket.aggregate([
+      { $match: { createdBy: new mongoose.Types.ObjectId(userId) } },
+      {
+        $group: {
+          _id: '$category',
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { count: -1 } }
+    ])
+  ]);
+
+  const stats = ticketStats[0] || {
+    total: 0,
+    open: 0,
+    inProgress: 0,
+    resolved: 0,
+    closed: 0,
+    urgent: 0,
+    high: 0,
+    medium: 0,
+    low: 0
+  };
+
+  res.json({
+    success: true,
+    data: {
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        department: user.department,
+        memberSince: user.createdAt
+      },
+      summary: {
+        totalTickets: stats.total,
+        statusBreakdown: {
+          open: stats.open,
+          inProgress: stats.inProgress,
+          pending: stats.open + stats.inProgress,
+          resolved: stats.resolved,
+          closed: stats.closed
+        },
+        priorityBreakdown: {
+          urgent: stats.urgent,
+          high: stats.high,
+          medium: stats.medium,
+          low: stats.low
+        },
+        categoryBreakdown: categoryBreakdown.reduce((acc, item) => {
+          acc[item._id] = item.count;
+          return acc;
+        }, {}),
+        resolutionRate: stats.total > 0 ? Math.round((stats.resolved / stats.total) * 100) : 0
+      },
+      recentTickets: recentTickets || []
+    }
   });
 });

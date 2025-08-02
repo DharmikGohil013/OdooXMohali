@@ -10,7 +10,9 @@ import {
   toggleUserStatus,
   changeUserRole,
   getUserActivity,
-  resetUserPassword
+  resetUserPassword,
+  getUserTickets,
+  getUserTicketSummary
 } from '../controllers/userController.js';
 import { protect, authorize } from '../middleware/authMiddleware.js';
 
@@ -35,5 +37,9 @@ router.put('/:id/toggle-status', authorize('admin'), toggleUserStatus);
 router.put('/:id/role', authorize('admin'), changeUserRole);
 router.get('/:id/activity', authorize('admin'), getUserActivity);
 router.put('/:id/reset-password', authorize('admin'), resetUserPassword);
+
+// User ticket management routes (Admin only)
+router.get('/:id/tickets', authorize('admin'), getUserTickets);
+router.get('/:id/tickets/summary', authorize('admin'), getUserTicketSummary);
 
 export default router;
